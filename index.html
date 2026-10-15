@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Персональный психолог</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--text:#222;--muted:#777;--accent:#5b7cfa;--border:#e3e1dc}
+@media (prefers-color-scheme:dark){:root{--bg:#161616;--card:#222;--text:#eee;--muted:#999;--accent:#7d97ff;--border:#333}}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text)}
+header{padding:16px;text-align:center;font-weight:600;font-size:18px}
+nav{display:flex;gap:4px;padding:0 8px;position:sticky;top:0;background:var(--bg);z-index:5}
+nav button{flex:1;padding:10px 4px;border:none;background:none;color:var(--muted);font-size:14px;border-bottom:2px solid transparent}
+nav button.active{color:var(--accent);border-color:var(--accent)}
+main{padding:12px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+h3{margin:0 0 10px;font-size:15px}
+textarea,input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit}
+textarea{min-height:110px;resize:vertical}
+.btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px}
+.btn.sec{background:var(--border);color:var(--text)}
+.btn.rec{background:#e5484d}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.emos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.emo{padding:10px 4px;border-radius:10px;border:3px solid transparent;color:#fff;font-size:14px;font-weight:600}
+.emo.sel{border-color:var(--text)}
+.emo.peek{outline:2px dashed var(--text);outline-offset:2px}
+#emoDesc{font-size:13px;color:var(--muted);min-height:18px;margin-top:8px}
+label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
+input[type=range]{width:100%}
+.meta{font-size:12px;color:var(--muted)}
+.sum{margin:6px 0;font-size:14px}
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;color:#fff;font-size:12px;margin:2px}
+.hidden{display:none}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>Персональный психолог</header>
+<nav>
+<button class="active" data-tab="write">Запись</button>
+<button data-tab="history">История</button>
+<button data-tab="patterns">Паттерны</button>
+<button data-tab="data">Данные</button>
+</nav>
+<main>
+<section id="write">
+<div class="card">
+<h3>Что происходит?</h3>
+<textarea id="text" placeholder="Пиши свободно или надиктуй голосом…"></textarea>
+<div class="row"><button class="btn sec" id="mic">🎤 Диктовать</button></div>
+</div>
+<div class="card">
+<h3>Эмоции</h3>
+<div class="emos" id="emos"></div>
+<div id="emoDesc"></div>
+</div>
+<div class="card">
+<h3>Разбор мысли</h3>
+<label>Ситуация</label><input type="text" id="sit">
+<label>Автоматическая мысль</label><input type="text" id="thought">
+<label>Интенсивность до: <b id="bv">5</b></label><input type="range" id="before" min="0" max="10" value="5">
+<label>Альтернативная мысль</label><input type="text" id="alt">
+<label>Интенсивность после: <b id="av">5</b></label><input type="range" id="after" min="0" max="10" value="5">
+</div>
+<button class="btn" id="save" style="width:100%">Сохранить сессию</button>
+</section>
+<section id="history" class="hidden"><div id="histList"></div></section>
+<section id="patterns" class="hidden">
+<p class="meta" id="chartsNote"></p>
+<div class="card"><h3>Частота эмоций</h3><canvas id="c1"></canvas></div>
+<div class="card"><h3>Интенсивность до и после</h3><canvas id="c2"></canvas></div>
+</section>
+<section id="data" class="hidden">
+<div class="card">
+<h3>Экспорт</h3>
+<p class="meta">Сохрани копию записей, чтобы не потерять их.</p>
+<div class="row"><button class="btn" id="exp">Скачать JSON</button><button class="btn sec" id="cp">Скопировать</button></div>
+</div>
+<div class="card">
+<h3>Импорт</h3>
+<p class="meta">Загрузи ранее сохранённый JSON-файл. Записи добавятся к текущим.</p>
+<input type="file" id="imp" accept=".json,application/json">
+</div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);
+const EMOS=[
+{id:'joy',name:'Радость',color:'#2e9e5b',desc:'Удовольствие, благодарность, лёгкость'},
+{id:'calm',name:'Спокойствие',color:'#6fa83a',desc:'Умиротворение, расслабленность, безопасность'},
+{id:'interest',name:'Интерес',color:'#b89a14',desc:'Любопытство, вовлечённость, предвкушение'},
+{id:'anxiety',name:'Тревога',color:'#e08a1e',desc:'Беспокойство, напряжение, страх'},
+{id:'sad',name:'Грусть',color:'#d9582b',desc:'Печаль, усталость, одиночество'},
+{id:'anger',name:'Злость',color:'#c62828',desc:'Раздражение, обида, гнев'}];
+const EMO=Object.fromEntries(EMOS.map(e=>[e.id,e]));
+const KEY='psy_sessions';
+let sessions=[];
+try{sessions=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){sessions=[]}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(sessions))}catch(e){toast('Не удалось сохранить')}}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==b.dataset.tab));
+if(b.dataset.tab==='history')renderHistory();
+if(b.dataset.tab==='patterns')renderCharts();});
+
+let selected=new Set(),peek=null;
+function renderEmos(){const box=$('emos');box.innerHTML='';
+EMOS.forEach(e=>{const b=document.createElement('button');
+b.className='emo'+(selected.has(e.id)?' sel':'')+(peek===e.id?' peek':'');
+b.style.background=e.color;b.textContent=(selected.has(e.id)?'✓ ':'')+e.name;
+b.onclick=()=>{if(peek===e.id){selected.has(e.id)?selected.delete(e.id):selected.add(e.id);peek=null;$('emoDesc').textContent=''}
+else{peek=e.id;$('emoDesc').textContent=e.desc+' — нажми ещё раз, чтобы '+(selected.has(e.id)?'снять':'выбрать')}
+renderEmos()};box.appendChild(b)})}
+renderEmos();
+
+$('before').oninput=e=>$('bv').textContent=e.target.value;
+$('after').oninput=e=>$('av').textContent=e.target.value;
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,recOn=false;
+function updMic(){$('mic').textContent=recOn?'⏹ Остановить':'🎤 Диктовать';$('mic').className='btn '+(recOn?'rec':'sec')}
+$('mic').onclick=()=>{if(!SR){toast('Голосовой ввод не поддерживается в этом браузере');return}
+if(recOn){rec.stop();return}
+rec=new SR();rec.lang='ru-RU';rec.continuous=true;rec.interimResults=false;
+rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const t=$('text');t.value+=(t.value&&!t.value.endsWith(' ')?' ':'')+e.results[i][0].transcript}}};
+rec.onend=()=>{recOn=false;updMic()};
+rec.onerror=e=>toast('Микрофон: '+e.error);
+rec.start();recOn=true;updMic()};
+
+function summarize(s){const p=[];
+if(s.emotions.length)p.push('Эмоции: '+s.emotions.map(id=>EMO[id]?EMO[id].name:id).join(', ')+'.');
+if(s.situation||s.thought){const d=s.before-s.after;
+p.push(d>0?`Интенсивность снизилась с ${s.before} до ${s.after}.`:d<0?`Интенсивность выросла с ${s.before} до ${s.after}.`:`Интенсивность без изменений (${s.before}).`)}
+const src=s.text||s.situation||s.thought;
+if(src)p.push('«'+(src.length>90?src.slice(0,90)+'…':src)+'»');
+return p.join(' ')}
+
+$('save').onclick=()=>{const s={id:Date.now(),date:new Date().toISOString(),text:$('text').value.trim(),emotions:[...selected],
+situation:$('sit').value.trim(),thought:$('thought').value.trim(),alt:$('alt').value.trim(),before:+$('before').value,after:+$('after').value};
+if(!s.text&&!s.emotions.length&&!s.situation&&!s.thought){toast('Запись пустая');return}
+s.summary=summarize(s);sessions.unshift(s);persist();
+['text','sit','thought','alt'].forEach(id=>$(id).value='');
+$('before').value=$('after').value=5;$('bv').textContent=$('av').textContent='5';
+selected.clear();peek=null;$('emoDesc').textContent='';renderEmos();toast('Сохранено ✓')};
+
+function renderHistory(){const l=$('histList');
+if(!sessions.length){l.innerHTML='<p class="meta">Пока нет записей.</p>';return}
+l.innerHTML=sessions.map(s=>`<div class="card">
+<div class="meta">${new Date(s.date).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</div>
+<div>${s.emotions.map(id=>EMO[id]?`<span class="tag" style="background:${EMO[id].color}">${EMO[id].name}</span>`:'').join('')}</div>
+<div class="sum">${esc(s.summary)}</div>
+<details><summary class="meta">Подробнее</summary>
+${s.text?`<p>${esc(s.text)}</p>`:''}
+${s.situation?`<p><b>Ситуация:</b> ${esc(s.situation)}</p>`:''}
+${s.thought?`<p><b>Мысль:</b> ${esc(s.thought)} (${s.before}/10)</p>`:''}
+${s.alt?`<p><b>Альтернатива:</b> ${esc(s.alt)} (${s.after}/10)</p>`:''}
+<button class="btn sec" onclick="delS(${s.id})">Удалить</button>
+</details></div>`).join('')}
+function delS(id){if(!confirm('Удалить эту запись?'))return;sessions=sessions.filter(s=>s.id!==id);persist();renderHistory()}
+
+let c1,c2;
+function renderCharts(){if(typeof Chart==='undefined'){$('chartsNote').textContent='Графики не загрузились — нужен интернет.';return}
+Chart.defaults.color='#888';
+c1&&c1.destroy();
+c1=new Chart($('c1'),{type:'bar',data:{labels:EMOS.map(e=>e.name),datasets:[{data:EMOS.map(e=>sessions.filter(s=>s.emotions.includes(e.id)).length),backgroundColor:EMOS.map(e=>e.color)}]},
+options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+const tr=sessions.filter(s=>s.situation||s.thought).slice(0,20).reverse();
+c2&&c2.destroy();
+c2=new Chart($('c2'),{type:'line',data:{labels:tr.map(s=>new Date(s.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),
+datasets:[{label:'До',data:tr.map(s=>s.before),borderColor:'#e5484d',tension:.3},{label:'После',data:tr.map(s=>s.after),borderColor:'#2e9e5b',tension:.3}]},
+options:{scales:{y:{min:0,max:10}}}});
+$('chartsNote').textContent=sessions.length?'':'Пока нет записей — графики появятся после первых сессий.'}
+
+function payload(){return JSON.stringify({app:'psycholog',version:1,sessions},null,2)}
+$('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([payload()],{type:'application/json'}));
+a.download='psycholog-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove()};
+$('cp').onclick=()=>navigator.clipboard.writeText(payload()).then(()=>toast('Скопировано'),()=>toast('Не удалось скопировать'));
+$('imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+r.onload=()=>{try{const d=JSON.parse(r.result);const arr=Array.isArray(d)?d:d.sessions;if(!Array.isArray(arr))throw 0;
+const ids=new Set(sessions.map(s=>s.id));let n=0;
+arr.forEach(s=>{if(s&&s.id&&!ids.has(s.id)){s.emotions=s.emotions||[];sessions.push(s);n++}});
+sessions.sort((a,b)=>b.id-a.id);persist();toast('Добавлено записей: '+n)}catch(err){toast('Файл не подходит')}};
+r.readAsText(f);e.target.value=''};
+</script>
+</body>
+  </html>
