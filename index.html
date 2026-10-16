@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Персональный психолог</title>
+<title>Personal Psychologist</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{--bg:#f6f5f2;--card:#fff;--text:#222;--muted:#777;--accent:#5b7cfa;--border:#e3e1dc}
@@ -21,6 +21,12 @@ nav button.active{color:var(--accent);border-color:var(--accent)}
 main{padding:12px;max-width:640px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
 h3{margin:0 0 10px;font-size:15px}
+.cardHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cardHead h3{margin:0}
+.reminder{border:2px solid var(--accent)}
+.remText{white-space:pre-wrap;font-size:16px;line-height:1.5}
+.remEmpty{color:var(--muted);font-style:italic;font-size:14px}
+.link{background:none;border:none;color:var(--accent);font-size:14px;padding:4px}
 textarea,input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit}
 textarea{min-height:110px;resize:vertical}
 .btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px}
@@ -37,7 +43,7 @@ input[type=range]{width:100%}
 .meta{font-size:12px;color:var(--muted)}
 .sum{margin:6px 0;font-size:14px}
 .tag{display:inline-block;padding:2px 8px;border-radius:8px;color:#fff;font-size:12px;margin:2px}
-.hidden{display:none}
+.hidden{display:none!important}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 </style>
@@ -55,6 +61,14 @@ input[type=range]{width:100%}
 </nav>
 <main>
 <section id="write">
+<div class="card reminder">
+<div class="cardHead"><h3 data-i="remTitle"></h3><button class="link" id="remEdit" data-i="edit"></button></div>
+<div id="remView" class="remText"></div>
+<div id="remForm" class="hidden">
+<textarea id="remInput" data-ph="remPh"></textarea>
+<div class="row"><button class="btn" id="remSave" data-i="saveRem"></button><button class="btn sec" id="remCancel" data-i="cancel"></button></div>
+</div>
+</div>
 <div class="card">
 <h3 data-i="whatHappens"></h3>
 <textarea id="text" data-ph="textPh"></textarea>
@@ -99,6 +113,8 @@ input[type=range]{width:100%}
 const $=id=>document.getElementById(id);
 const I18N={
 ru:{title:'Персональный психолог',tabWrite:'Запись',tabHistory:'История',tabPatterns:'Паттерны',tabData:'Данные',
+remTitle:'✨ Напоминание от Высшего Я',edit:'Изменить',remPh:'Напиши себе напоминание…',saveRem:'Сохранить',cancel:'Отмена',
+remEmpty:'Пока пусто. Нажми «Изменить», чтобы написать напоминание.',remSaved:'Напоминание сохранено ✓',
 whatHappens:'Что происходит?',textPh:'Пиши свободно или надиктуй голосом…',dictate:'🎤 Диктовать',stop:'⏹ Остановить',
 emotions:'Эмоции',thoughtRecord:'Разбор мысли',situation:'Ситуация',autoThought:'Автоматическая мысль',before:'Интенсивность до',
 alt:'Альтернативная мысль',after:'Интенсивность после',save:'Сохранить сессию',saved:'Сохранено ✓',empty:'Запись пустая',
@@ -115,6 +131,8 @@ emo:{joy:['Радость','Удовольствие, благодарность
 interest:['Интерес','Любопытство, вовлечённость, предвкушение'],anxiety:['Тревога','Беспокойство, напряжение, страх'],
 sad:['Грусть','Печаль, усталость, одиночество'],anger:['Злость','Раздражение, обида, гнев']}},
 de:{title:'Persönlicher Psychologe',tabWrite:'Eintrag',tabHistory:'Verlauf',tabPatterns:'Muster',tabData:'Daten',
+remTitle:'✨ Erinnerung vom Höheren Selbst',edit:'Bearbeiten',remPh:'Schreib dir eine Erinnerung…',saveRem:'Speichern',cancel:'Abbrechen',
+remEmpty:'Noch leer. Tippe auf „Bearbeiten“, um eine Erinnerung zu schreiben.',remSaved:'Erinnerung gespeichert ✓',
 whatHappens:'Was beschäftigt dich?',textPh:'Schreib frei oder sprich ein…',dictate:'🎤 Diktieren',stop:'⏹ Stoppen',
 emotions:'Gefühle',thoughtRecord:'Gedanken-Check',situation:'Situation',autoThought:'Automatischer Gedanke',before:'Intensität vorher',
 alt:'Alternativer Gedanke',after:'Intensität nachher',save:'Sitzung speichern',saved:'Gespeichert ✓',empty:'Der Eintrag ist leer',
@@ -131,128 +149,9 @@ emo:{joy:['Freude','Vergnügen, Dankbarkeit, Leichtigkeit'],calm:['Ruhe','Gelass
 interest:['Interesse','Neugier, Engagement, Vorfreude'],anxiety:['Angst','Sorge, Anspannung, Furcht'],
 sad:['Traurigkeit','Kummer, Müdigkeit, Einsamkeit'],anger:['Wut','Ärger, Kränkung, Zorn']}},
 en:{title:'Personal Psychologist',tabWrite:'Entry',tabHistory:'History',tabPatterns:'Patterns',tabData:'Data',
+remTitle:'✨ Higher-self reminder',edit:'Edit',remPh:'Write yourself a reminder…',saveRem:'Save',cancel:'Cancel',
+remEmpty:'Empty for now. Tap "Edit" to write your reminder.',remSaved:'Reminder saved ✓',
 whatHappens:"What's going on?",textPh:'Write freely or dictate…',dictate:'🎤 Dictate',stop:'⏹ Stop',
 emotions:'Emotions',thoughtRecord:'Thought record',situation:'Situation',autoThought:'Automatic thought',before:'Intensity before',
 alt:'Alternative thought',after:'Intensity after',save:'Save session',saved:'Saved ✓',empty:'The entry is empty',
-noEntries:'No entries yet.',more:'Details',thought:'Thought',alternative:'Alternative',del:'Delete',confirmDel:'Delete this entry?',
-freq:'Emotion frequency',intensity:'Intensity before and after',cBefore:'Before',cAfter:'After',
-noCharts:"Charts couldn't load — internet needed.",chartsEmpty:'No entries yet — charts will appear after your first sessions.',
-export:'Export',exportNote:'Save a copy of your entries so you never lose them.',download:'Download JSON',copy:'Copy',
-copied:'Copied',copyFail:"Couldn't copy",import:'Import',importNote:'Load a saved JSON file. Entries will be added to the current ones.',
-imported:'Entries added: ',badFile:"This file doesn't fit",noSpeech:'Voice input is not supported in this browser',
-mic:'Microphone: ',saveFail:"Couldn't save",tapSel:' — tap again to select',tapUnsel:' — tap again to remove',
-sumEmo:'Emotions: ',down:(b,a)=>`Intensity dropped from ${b} to ${a}.`,up:(b,a)=>`Intensity rose from ${b} to ${a}.`,same:b=>`Intensity unchanged (${b}).`,
-speech:'en-US',locale:'en-GB',
-emo:{joy:['Joy','Pleasure, gratitude, lightness'],calm:['Calm','Peace, relaxation, safety'],
-interest:['Interest','Curiosity, engagement, anticipation'],anxiety:['Anxiety','Worry, tension, fear'],
-sad:['Sadness','Sorrow, tiredness, loneliness'],anger:['Anger','Irritation, resentment, rage']}}};
-const EMOS=[{id:'joy',color:'#2e9e5b'},{id:'calm',color:'#6fa83a'},{id:'interest',color:'#b89a14'},
-{id:'anxiety',color:'#e08a1e'},{id:'sad',color:'#d9582b'},{id:'anger',color:'#c62828'}];
-const COLOR=Object.fromEntries(EMOS.map(e=>[e.id,e.color]));
-let lang='ru';
-try{lang=localStorage.getItem('psy_lang')||''}catch(e){}
-if(!I18N[lang]){const n=(navigator.language||'ru').slice(0,2);lang=I18N[n]?n:'ru'}
-const T=()=>I18N[lang];
-const ename=id=>T().emo[id]?T().emo[id][0]:id;
-const KEY='psy_sessions';
-let sessions=[];
-try{sessions=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){sessions=[]}
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(sessions))}catch(e){toast(T().saveFail)}}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-let currentTab='write';
-
-function applyLang(){document.documentElement.lang=lang;document.title=T().title;
-document.querySelectorAll('[data-i]').forEach(el=>el.textContent=T()[el.dataset.i]);
-document.querySelectorAll('[data-ph]').forEach(el=>el.placeholder=T()[el.dataset.ph]);
-document.querySelectorAll('.langs button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
-peek=null;$('emoDesc').textContent='';renderEmos();updMic();
-if(currentTab==='history')renderHistory();if(currentTab==='patterns')renderCharts()}
-document.querySelectorAll('.langs button').forEach(b=>b.onclick=()=>{if(recOn)rec.stop();lang=b.dataset.lang;
-try{localStorage.setItem('psy_lang',lang)}catch(e){}applyLang()});
-
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{currentTab=b.dataset.tab;
-document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
-document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==currentTab));
-if(currentTab==='history')renderHistory();if(currentTab==='patterns')renderCharts()});
-
-let selected=new Set(),peek=null;
-function renderEmos(){const box=$('emos');box.innerHTML='';
-EMOS.forEach(e=>{const b=document.createElement('button');
-b.className='emo'+(selected.has(e.id)?' sel':'')+(peek===e.id?' peek':'');
-b.style.background=e.color;b.textContent=(selected.has(e.id)?'✓ ':'')+ename(e.id);
-b.onclick=()=>{if(peek===e.id){selected.has(e.id)?selected.delete(e.id):selected.add(e.id);peek=null;$('emoDesc').textContent=''}
-else{peek=e.id;$('emoDesc').textContent=T().emo[e.id][1]+(selected.has(e.id)?T().tapUnsel:T().tapSel)}
-renderEmos()};box.appendChild(b)})}
-
-$('before').oninput=e=>$('bv').textContent=e.target.value;
-$('after').oninput=e=>$('av').textContent=e.target.value;
-
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,recOn=false;
-function updMic(){$('mic').textContent=recOn?T().stop:T().dictate;$('mic').className='btn '+(recOn?'rec':'sec')}
-$('mic').onclick=()=>{if(!SR){toast(T().noSpeech);return}
-if(recOn){rec.stop();return}
-rec=new SR();rec.lang=T().speech;rec.continuous=true;rec.interimResults=false;
-rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const t=$('text');t.value+=(t.value&&!t.value.endsWith(' ')?' ':'')+e.results[i][0].transcript}}};
-rec.onend=()=>{recOn=false;updMic()};
-rec.onerror=e=>toast(T().mic+e.error);
-rec.start();recOn=true;updMic()};
-
-function summarize(s){const p=[];const em=s.emotions||[];
-if(em.length)p.push(T().sumEmo+em.map(ename).join(', ')+'.');
-if(s.situation||s.thought){const d=s.before-s.after;p.push(d>0?T().down(s.before,s.after):d<0?T().up(s.before,s.after):T().same(s.before))}
-const src=s.text||s.situation||s.thought;
-if(src)p.push('«'+(src.length>90?src.slice(0,90)+'…':src)+'»');
-return p.join(' ')}
-
-$('save').onclick=()=>{const s={id:Date.now(),date:new Date().toISOString(),text:$('text').value.trim(),emotions:[...selected],
-situation:$('sit').value.trim(),thought:$('thought').value.trim(),alt:$('alt').value.trim(),before:+$('before').value,after:+$('after').value};
-if(!s.text&&!s.emotions.length&&!s.situation&&!s.thought){toast(T().empty);return}
-sessions.unshift(s);persist();
-['text','sit','thought','alt'].forEach(id=>$(id).value='');
-$('before').value=$('after').value=5;$('bv').textContent=$('av').textContent='5';
-selected.clear();peek=null;$('emoDesc').textContent='';renderEmos();toast(T().saved)};
-
-function renderHistory(){const l=$('histList');
-if(!sessions.length){l.innerHTML=`<p class="meta">${T().noEntries}</p>`;return}
-l.innerHTML=sessions.map(s=>`<div class="card">
-<div class="meta">${new Date(s.date).toLocaleString(T().locale,{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</div>
-<div>${(s.emotions||[]).map(id=>COLOR[id]?`<span class="tag" style="background:${COLOR[id]}">${ename(id)}</span>`:'').join('')}</div>
-<div class="sum">${esc(summarize(s))}</div>
-<details><summary class="meta">${T().more}</summary>
-${s.text?`<p>${esc(s.text)}</p>`:''}
-${s.situation?`<p><b>${T().situation}:</b> ${esc(s.situation)}</p>`:''}
-${s.thought?`<p><b>${T().thought}:</b> ${esc(s.thought)} (${s.before}/10)</p>`:''}
-${s.alt?`<p><b>${T().alternative}:</b> ${esc(s.alt)} (${s.after}/10)</p>`:''}
-<button class="btn sec" onclick="delS(${s.id})">${T().del}</button>
-</details></div>`).join('')}
-function delS(id){if(!confirm(T().confirmDel))return;sessions=sessions.filter(s=>s.id!==id);persist();renderHistory()}
-
-let c1,c2;
-function renderCharts(){if(typeof Chart==='undefined'){$('chartsNote').textContent=T().noCharts;return}
-Chart.defaults.color='#888';
-c1&&c1.destroy();
-c1=new Chart($('c1'),{type:'bar',data:{labels:EMOS.map(e=>ename(e.id)),datasets:[{data:EMOS.map(e=>sessions.filter(s=>(s.emotions||[]).includes(e.id)).length),backgroundColor:EMOS.map(e=>e.color)}]},
-options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-const tr=sessions.filter(s=>s.situation||s.thought).slice(0,20).reverse();
-c2&&c2.destroy();
-c2=new Chart($('c2'),{type:'line',data:{labels:tr.map(s=>new Date(s.date).toLocaleDateString(T().locale,{day:'numeric',month:'short'})),
-datasets:[{label:T().cBefore,data:tr.map(s=>s.before),borderColor:'#e5484d',tension:.3},{label:T().cAfter,data:tr.map(s=>s.after),borderColor:'#2e9e5b',tension:.3}]},
-options:{scales:{y:{min:0,max:10}}}});
-$('chartsNote').textContent=sessions.length?'':T().chartsEmpty}
-
-function payload(){return JSON.stringify({app:'psycholog',version:1,sessions},null,2)}
-$('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([payload()],{type:'application/json'}));
-a.download='psycholog-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove()};
-$('cp').onclick=()=>navigator.clipboard.writeText(payload()).then(()=>toast(T().copied),()=>toast(T().copyFail));
-$('imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-r.onload=()=>{try{const d=JSON.parse(r.result);const arr=Array.isArray(d)?d:d.sessions;if(!Array.isArray(arr))throw 0;
-const ids=new Set(sessions.map(s=>s.id));let n=0;
-arr.forEach(s=>{if(s&&s.id&&!ids.has(s.id)){s.emotions=s.emotions||[];sessions.push(s);n++}});
-sessions.sort((a,b)=>b.id-a.id);persist();toast(T().imported+n)}catch(err){toast(T().badFile)}};
-r.readAsText(f);e.target.value=''};
-
-applyLang();
-</script>
-</body>
-</html>
+noEntries:'No entri
